@@ -31,16 +31,20 @@ jobs:
 
       # -------------------------------------------------
       # Resolve Music version from Morphe patches
-      # SOURCE: HideVideoAds.kt (LOCKED)
+      # SOURCE: patches-list.json (AUTHORITATIVE)
       # -------------------------------------------------
       - name: Resolve Music version from Morphe patches
         run: |
           set -e
 
-          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/music/ad/video/HideVideoAds.kt"
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
 
           MUSIC_VERSION=$(curl -s "$SOURCE_URL" \
-            | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
+            | jq -r '
+                .patches[]
+                | .compatiblePackages["com.google.android.apps.youtube.music"]? // empty
+                | .[]
+              ' \
             | sort -V \
             | tail -n 1)
 
