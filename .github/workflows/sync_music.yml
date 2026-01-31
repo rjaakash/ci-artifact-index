@@ -30,8 +30,8 @@ jobs:
           pip install requests beautifulsoup4
 
       # -------------------------------------------------
-      # Resolve supported Music version
-      # (from compatibleWith block only)
+      # Resolve Music version from Morphe patches
+      # SOURCE: HideVideoAds.kt (LOCKED)
       # -------------------------------------------------
       - name: Resolve Music version from Morphe patches
         run: |
@@ -40,7 +40,6 @@ jobs:
           SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/music/ad/video/HideVideoAds.kt"
 
           MUSIC_VERSION=$(curl -s "$SOURCE_URL" \
-            | grep -Eo 'compatibleWith\([^)]*\)' \
             | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
             | sort -V \
             | tail -n 1)
@@ -54,9 +53,9 @@ jobs:
           echo "MUSIC_VERSION=$MUSIC_VERSION" >> "$GITHUB_ENV"
 
       # -------------------------------------------------
-      # Download Music APK
+      # Download Music APK from APKMirror
       # -------------------------------------------------
-      - name: Run Music sync script
+      - name: Download Music APK
         env:
           MUSIC_VERSION: ${{ env.MUSIC_VERSION }}
         run: |
@@ -81,7 +80,7 @@ jobs:
             tmp/Music-${{ env.MUSIC_VERSION }}.apk
 
       # -------------------------------------------------
-      # Update local version record
+      # Update music.txt
       # -------------------------------------------------
       - name: Update music.txt
         if: success()
