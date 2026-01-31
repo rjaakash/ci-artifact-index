@@ -26,7 +26,7 @@ jobs:
       # -------------------------------------------------
       # Checkout repository
       #
-      # Required to read youtube.txt and music.txt
+      # Required to read youtube.txt, music.txt, reddit.txt
       # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -94,6 +94,37 @@ jobs:
           fi
 
       # -------------------------------------------------
+      # Resolve latest supported Reddit version
+      # SOURCE: patches-list.json (AUTHORITATIVE)
+      # -------------------------------------------------
+      - name: Resolve Reddit version from Morphe patches
+        id: reddit
+        run: |
+          set -e
+
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
+
+          LATEST=$(curl -s "$SOURCE_URL" \
+            | jq -r '
+                .patches[]
+                | .compatiblePackages["com.reddit.frontpage"]? // empty
+                | .[]
+              ' \
+            | sort -V \
+            | tail -n 1)
+
+          CURRENT=$(cat reddit.txt 2>/dev/null || echo "")
+
+          echo "Latest Reddit version : $LATEST"
+          echo "Current Reddit version: $CURRENT"
+
+          if [ -n "$LATEST" ] && [ "$LATEST" != "$CURRENT" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -------------------------------------------------
       # Trigger YouTube sync workflow
       # -------------------------------------------------
       - name: Trigger YouTube sync
@@ -112,3 +143,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run sync_music.yml
+
+      # -------------------------------------------------
+      # Trigger Reddit sync workflow
+      # -------------------------------------------------
+      - name: Trigger Reddit sync
+        if: steps.reddit.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run sync_reddit.yml
