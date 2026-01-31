@@ -80,7 +80,7 @@ jobs:
             tmp/Music-${{ env.MUSIC_VERSION }}.apk
 
       # -------------------------------------------------
-      # Update music.txt
+      # Update music.txt (race-safe)
       # -------------------------------------------------
       - name: Update music.txt
         if: success()
@@ -97,4 +97,6 @@ jobs:
           fi
 
           git commit -m "chore(music): sync Music ${MUSIC_VERSION}"
+
+          git pull --rebase origin main
           git push
