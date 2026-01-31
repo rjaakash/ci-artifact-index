@@ -30,15 +30,17 @@ jobs:
           pip install requests beautifulsoup4
 
       # -------------------------------------------------
-      # Resolve supported Music version from Morphe patches
+      # Resolve supported Music version
+      # (from compatibleWith block only)
       # -------------------------------------------------
       - name: Resolve Music version from Morphe patches
         run: |
           set -e
 
-          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/music/ad/AudioAdsPatch.kt"
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/music/ad/video/HideVideoAds.kt"
 
           MUSIC_VERSION=$(curl -s "$SOURCE_URL" \
+            | grep -Eo 'compatibleWith\([^)]*\)' \
             | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
             | sort -V \
             | tail -n 1)
@@ -52,7 +54,7 @@ jobs:
           echo "MUSIC_VERSION=$MUSIC_VERSION" >> "$GITHUB_ENV"
 
       # -------------------------------------------------
-      # Download Music APK from APKMirror
+      # Download Music APK
       # -------------------------------------------------
       - name: Run Music sync script
         env:
@@ -81,7 +83,7 @@ jobs:
       # -------------------------------------------------
       # Update local version record
       # -------------------------------------------------
-      - name: Update music version file
+      - name: Update music.txt
         if: success()
         run: |
           echo "$MUSIC_VERSION" > music.txt
