@@ -1,0 +1,89 @@
+name: Repository Hard Cleanup
+
+on:
+  # Manual trigger ONLY
+  # This workflow is intentionally NOT scheduled
+  # Use with caution
+  workflow_dispatch:
+
+permissions:
+  # Required to delete releases and tags
+  contents: write
+
+  # Required to delete workflow runs
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      # =================================================
+      # Checkout repository
+      # (Not strictly required, but keeps repo context
+      #  available if needed)
+      # =================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # =================================================
+      # HARD release cleanup
+      # ⚠️ DESTRUCTIVE OPERATION
+      #
+      # - Deletes ALL GitHub releases
+      # - Deletes ALL associated Git tags
+      # - Intended for full repository reset
+      # =================================================
+      - name: Delete all releases and tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Deleting all releases..."
+          gh release list --limit 100 --json tagName -q '.[].tagName' \
+          | while read -r tag; do
+              echo "Deleting release and tag: $tag"
+              gh release delete "$tag" --yes || true
+              git push origin ":refs/tags/$tag" || true
+            done
+
+      # =================================================
+      # Reset version tracking files
+      #
+      # - Sets youtube.txt and music.txt to 0
+      # - Commits the reset state
+      # =================================================
+      - name: Reset version files
+        run: |
+          echo "0" > youtube.txt
+          echo "0" > music.txt
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add youtube.txt music.txt
+
+          if git diff --cached --quiet; then
+            echo "No version reset needed"
+            exit 0
+          fi
+
+          git commit -m "chore: hard reset version tracking"
+          git push
+
+      # =================================================
+      # HARD workflow runs cleanup
+      # ⚠️ DESTRUCTIVE OPERATION
+      #
+      # - Keeps ONLY the most recent workflow run
+      # - Deletes all older runs across all workflows
+      # =================================================
+      - name: Delete old workflow runs (keep 1)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run list -L300 --json databaseId \
+            -q '.[].databaseId' \
+          | tail -n +2 \
+          | xargs -r -I ID gh api \
+            repos/$GITHUB_REPOSITORY/actions/runs/ID \
+            -X DELETE
