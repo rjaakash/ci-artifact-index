@@ -28,6 +28,7 @@ jobs:
 
       # -------------------------------------------------
       # Resolve latest supported YouTube version
+      # (from compatibleWith block only)
       # -------------------------------------------------
       - name: Resolve YouTube version from Morphe patches
         run: |
@@ -36,10 +37,17 @@ jobs:
           SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/youtube/ad/video/VideoAdsPatch.kt"
 
           YT_VERSION=$(curl -s "$SOURCE_URL" \
+            | grep -Eo 'compatibleWith\([^)]*\)' \
             | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
             | sort -V \
             | tail -n 1)
 
+          if [ -z "$YT_VERSION" ]; then
+            echo "Failed to resolve YouTube version"
+            exit 1
+          fi
+
+          echo "Resolved YouTube version: $YT_VERSION"
           echo "YT_VERSION=$YT_VERSION" >> "$GITHUB_ENV"
 
       # -------------------------------------------------
@@ -64,7 +72,7 @@ jobs:
           body: |
             Automated YouTube APK sync.
 
-            Source: APKMirror  
+            Source: APKMirror
             Version: ${{ env.YT_VERSION }}
           files: |
             tmp/YouTube-${{ env.YT_VERSION }}.apk
