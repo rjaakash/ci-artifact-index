@@ -1,0 +1,106 @@
+name: Sync Reddit APK
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+
+  # Allow calling from version-watcher.yml
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------
+      # Checkout repository
+      # -------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------
+      # Install Python dependencies
+      # -------------------------------------------------
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install requests beautifulsoup4
+
+      # -------------------------------------------------
+      # Resolve Reddit version from Morphe patches
+      # SOURCE: patches-list.json (AUTHORITATIVE)
+      # -------------------------------------------------
+      - name: Resolve Reddit version from Morphe patches
+        run: |
+          set -e
+
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
+
+          REDDIT_VERSION=$(curl -s "$SOURCE_URL" \
+            | jq -r '
+                .patches[]
+                | .compatiblePackages["com.reddit.frontpage"]? // empty
+                | .[]
+              ' \
+            | sort -V \
+            | tail -n 1)
+
+          if [ -z "$REDDIT_VERSION" ]; then
+            echo "Failed to resolve Reddit version"
+            exit 1
+          fi
+
+          echo "Resolved Reddit version: $REDDIT_VERSION"
+          echo "REDDIT_VERSION=$REDDIT_VERSION" >> "$GITHUB_ENV"
+
+      # -------------------------------------------------
+      # Download Reddit bundle from APKMirror
+      # -------------------------------------------------
+      - name: Download Reddit bundle
+        env:
+          REDDIT_VERSION: ${{ env.REDDIT_VERSION }}
+        run: |
+          python3 scripts/sync_reddit.py
+
+      # -------------------------------------------------
+      # Create GitHub release and upload bundle
+      # -------------------------------------------------
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          tag_name: Reddit-${{ env.REDDIT_VERSION }}
+          name: Reddit ${{ env.REDDIT_VERSION }}
+          body: |
+            Automated Reddit bundle sync.
+
+            Source: APKMirror
+            Version: ${{ env.REDDIT_VERSION }}
+          files: |
+            tmp/Reddit-${{ env.REDDIT_VERSION }}.apkm
+
+      # -------------------------------------------------
+      # Update reddit.txt (race-safe)
+      # -------------------------------------------------
+      - name: Update reddit.txt
+        if: success()
+        run: |
+          echo "$REDDIT_VERSION" > reddit.txt
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add reddit.txt
+
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+
+          git commit -m "chore(reddit): sync Reddit ${REDDIT_VERSION}"
+
+          git pull --rebase origin main
+          git push
