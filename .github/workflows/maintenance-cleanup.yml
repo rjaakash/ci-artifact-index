@@ -1,0 +1,65 @@
+name: Repository Maintenance Cleanup
+
+on:
+  # -------------------------------------------------
+  # Scheduled maintenance run
+  # Executes every day at 00:00 UTC
+  # -------------------------------------------------
+  schedule:
+    - cron: "0 0 * * *"
+
+  # -------------------------------------------------
+  # Allows manual execution from GitHub UI
+  # -------------------------------------------------
+  workflow_dispatch:
+
+permissions:
+  # Required to delete releases and tags
+  contents: write
+
+  # Required to delete workflow runs
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      # =================================================
+      # Checkout repository
+      # (Not strictly required for cleanup, but harmless
+      #  and useful if repo context is needed later)
+      # =================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # =================================================
+      # Release cleanup
+      # - Keeps only the latest 10 GitHub releases
+      # - Deletes all older releases
+      # - Also removes their associated Git tags
+      # =================================================
+      - name: Cleanup old releases
+        uses: dev-drprasad/delete-older-releases@v0.3.4
+        with:
+          keep_latest: 10
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # =================================================
+      # Workflow runs cleanup
+      # - Fetches up to 300 recent workflow runs
+      # - Keeps the latest 100 runs
+      # - Deletes all older runs
+      # =================================================
+      - name: Cleanup old workflow runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run list -L300 --json databaseId \
+            -q '.[].databaseId' \
+          | tail -n +101 \
+          | xargs -r -I ID gh api \
+            repos/$GITHUB_REPOSITORY/actions/runs/ID \
+            -X DELETE
