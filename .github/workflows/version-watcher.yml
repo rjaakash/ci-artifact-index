@@ -33,16 +33,21 @@ jobs:
 
       # -------------------------------------------------
       # Resolve latest supported YouTube version
+      # SOURCE: patches-list.json (AUTHORITATIVE)
       # -------------------------------------------------
       - name: Resolve YouTube version from Morphe patches
         id: youtube
         run: |
           set -e
 
-          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/youtube/ad/video/VideoAdsPatch.kt"
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
 
           LATEST=$(curl -s "$SOURCE_URL" \
-            | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
+            | jq -r '
+                .patches[]
+                | .compatiblePackages["com.google.android.youtube"]? // empty
+                | .[]
+              ' \
             | sort -V \
             | tail -n 1)
 
@@ -59,16 +64,21 @@ jobs:
 
       # -------------------------------------------------
       # Resolve latest supported Music version
+      # SOURCE: patches-list.json (AUTHORITATIVE)
       # -------------------------------------------------
       - name: Resolve Music version from Morphe patches
         id: music
         run: |
           set -e
 
-          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/music/ad/video/HideVideoAds.kt"
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
 
           LATEST=$(curl -s "$SOURCE_URL" \
-            | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
+            | jq -r '
+                .patches[]
+                | .compatiblePackages["com.google.android.apps.youtube.music"]? // empty
+                | .[]
+              ' \
             | sort -V \
             | tail -n 1)
 
