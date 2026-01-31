@@ -2,6 +2,7 @@ name: Sync YouTube APK
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: write
@@ -12,38 +13,43 @@ jobs:
 
     steps:
       # -------------------------------------------------
-      # Repository checkout
+      # Checkout repository
       # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # -------------------------------------------------
-      # Python setup
-      # -------------------------------------------------
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      # -------------------------------------------------
-      # Install dependencies
+      # Install Python dependencies
       # -------------------------------------------------
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
+          python3 -m pip install --upgrade pip
           pip install requests beautifulsoup4
 
       # -------------------------------------------------
-      # Run downloader script
+      # Resolve latest supported YouTube version
+      # -------------------------------------------------
+      - name: Resolve YouTube version from Morphe patches
+        run: |
+          set -e
+
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/youtube/ad/video/VideoAdsPatch.kt"
+
+          YT_VERSION=$(curl -s "$SOURCE_URL" \
+            | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
+            | sort -V \
+            | tail -n 1)
+
+          echo "YT_VERSION=$YT_VERSION" >> "$GITHUB_ENV"
+
+      # -------------------------------------------------
+      # Download YouTube APK
       # -------------------------------------------------
       - name: Download YouTube APK
-        id: download
         env:
-          YOUTUBE_VERSION: ${{ env.YOUTUBE_VERSION }}
+          YOUTUBE_VERSION: ${{ env.YT_VERSION }}
         run: |
-          OUTPUT=$(python scripts/sync_youtube.py)
-          echo "$OUTPUT"
-          echo "$OUTPUT" | grep APK_PATH= | sed 's/APK_PATH=//' > apk_path.txt
+          python3 scripts/sync_youtube.py
 
       # -------------------------------------------------
       # Create GitHub release and upload APK
@@ -53,22 +59,32 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
-          tag_name: YouTube-${{ env.YOUTUBE_VERSION }}
-          name: YouTube-${{ env.YOUTUBE_VERSION }}
+          tag_name: YouTube-${{ env.YT_VERSION }}
+          name: YouTube ${{ env.YT_VERSION }}
+          body: |
+            Automated YouTube APK sync.
+
+            Source: APKMirror  
+            Version: ${{ env.YT_VERSION }}
           files: |
-            $(cat apk_path.txt)
+            tmp/YouTube-${{ env.YT_VERSION }}.apk
 
       # -------------------------------------------------
-      # Update version tracking file
+      # Update version record
       # -------------------------------------------------
       - name: Update youtube.txt
         if: success()
         run: |
-          echo "${YOUTUBE_VERSION}" > youtube.txt
+          echo "${{ env.YT_VERSION }}" > youtube.txt
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
           git add youtube.txt
-          git commit -m "chore(youtube): sync YouTube ${YOUTUBE_VERSION}"
+
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+
+          git commit -m "chore(youtube): sync YouTube ${YT_VERSION}"
           git push
