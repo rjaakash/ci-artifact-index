@@ -1,7 +1,10 @@
 name: Sync YouTube APK
 
 on:
+  # Manual trigger
   workflow_dispatch:
+
+  # Allow calling from version-watcher.yml
   workflow_call:
 
 permissions:
@@ -27,8 +30,8 @@ jobs:
           pip install requests beautifulsoup4
 
       # -------------------------------------------------
-      # Resolve latest supported YouTube version
-      # (from compatibleWith block only)
+      # Resolve YouTube version from Morphe patches
+      # SOURCE: VideoAdsPatch.kt (LOCKED)
       # -------------------------------------------------
       - name: Resolve YouTube version from Morphe patches
         run: |
@@ -37,7 +40,6 @@ jobs:
           SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/youtube/ad/video/VideoAdsPatch.kt"
 
           YT_VERSION=$(curl -s "$SOURCE_URL" \
-            | grep -Eo 'compatibleWith\([^)]*\)' \
             | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
             | sort -V \
             | tail -n 1)
@@ -51,7 +53,7 @@ jobs:
           echo "YT_VERSION=$YT_VERSION" >> "$GITHUB_ENV"
 
       # -------------------------------------------------
-      # Download YouTube APK
+      # Download YouTube APK from APKMirror
       # -------------------------------------------------
       - name: Download YouTube APK
         env:
@@ -78,12 +80,12 @@ jobs:
             tmp/YouTube-${{ env.YT_VERSION }}.apk
 
       # -------------------------------------------------
-      # Update version record
+      # Update youtube.txt
       # -------------------------------------------------
       - name: Update youtube.txt
         if: success()
         run: |
-          echo "${{ env.YT_VERSION }}" > youtube.txt
+          echo "$YT_VERSION" > youtube.txt
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
