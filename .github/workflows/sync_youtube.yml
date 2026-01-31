@@ -80,7 +80,7 @@ jobs:
             tmp/YouTube-${{ env.YT_VERSION }}.apk
 
       # -------------------------------------------------
-      # Update youtube.txt
+      # Update youtube.txt (race-safe)
       # -------------------------------------------------
       - name: Update youtube.txt
         if: success()
@@ -97,4 +97,6 @@ jobs:
           fi
 
           git commit -m "chore(youtube): sync YouTube ${YT_VERSION}"
+
+          git pull --rebase origin main
           git push
