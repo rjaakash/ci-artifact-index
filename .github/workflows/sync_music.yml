@@ -1,0 +1,99 @@
+name: Sync Music APK
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+
+  # Allow calling from version-watcher.yml
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------
+      # Checkout repository
+      # -------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------
+      # Install Python dependencies
+      # -------------------------------------------------
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install requests beautifulsoup4
+
+      # -------------------------------------------------
+      # Resolve supported Music version from Morphe patches
+      # -------------------------------------------------
+      - name: Resolve Music version from Morphe patches
+        run: |
+          set -e
+
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/music/ad/AudioAdsPatch.kt"
+
+          MUSIC_VERSION=$(curl -s "$SOURCE_URL" \
+            | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
+            | sort -V \
+            | tail -n 1)
+
+          if [ -z "$MUSIC_VERSION" ]; then
+            echo "Failed to resolve Music version"
+            exit 1
+          fi
+
+          echo "Resolved Music version: $MUSIC_VERSION"
+          echo "MUSIC_VERSION=$MUSIC_VERSION" >> "$GITHUB_ENV"
+
+      # -------------------------------------------------
+      # Download Music APK from APKMirror
+      # -------------------------------------------------
+      - name: Run Music sync script
+        env:
+          MUSIC_VERSION: ${{ env.MUSIC_VERSION }}
+        run: |
+          python3 scripts/sync_music.py
+
+      # -------------------------------------------------
+      # Create GitHub release and upload APK
+      # -------------------------------------------------
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          tag_name: Music-${{ env.MUSIC_VERSION }}
+          name: Music ${{ env.MUSIC_VERSION }}
+          body: |
+            Automated YouTube Music APK sync.
+
+            Source: APKMirror
+            Version: ${{ env.MUSIC_VERSION }}
+          files: |
+            tmp/Music-${{ env.MUSIC_VERSION }}.apk
+
+      # -------------------------------------------------
+      # Update local version record
+      # -------------------------------------------------
+      - name: Update music version file
+        if: success()
+        run: |
+          echo "$MUSIC_VERSION" > music.txt
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add music.txt
+
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+
+          git commit -m "chore(music): sync Music ${MUSIC_VERSION}"
+          git push
