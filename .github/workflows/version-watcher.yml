@@ -1,0 +1,104 @@
+name: Version Watcher
+
+on:
+  # -------------------------------------------------
+  # Manual trigger
+  # -------------------------------------------------
+  workflow_dispatch:
+
+  # -------------------------------------------------
+  # Scheduled trigger
+  #
+  # Runs daily at 06:09 UTC
+  # -------------------------------------------------
+  schedule:
+    - cron: "9 6 * * *"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------
+      # Checkout repository
+      #
+      # Required to read youtube.txt and music.txt
+      # -------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------
+      # Resolve latest supported YouTube version
+      # -------------------------------------------------
+      - name: Resolve YouTube version from Morphe patches
+        id: youtube
+        run: |
+          set -e
+
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/youtube/ad/video/VideoAdsPatch.kt"
+
+          LATEST=$(curl -s "$SOURCE_URL" \
+            | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
+            | sort -V \
+            | tail -n 1)
+
+          CURRENT=$(cat youtube.txt 2>/dev/null || echo "")
+
+          echo "Latest YouTube version : $LATEST"
+          echo "Current YouTube version: $CURRENT"
+
+          if [ -n "$LATEST" ] && [ "$LATEST" != "$CURRENT" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -------------------------------------------------
+      # Resolve latest supported Music version
+      # -------------------------------------------------
+      - name: Resolve Music version from Morphe patches
+        id: music
+        run: |
+          set -e
+
+          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches/src/main/kotlin/app/morphe/patches/music/ad/video/HideVideoAds.kt"
+
+          LATEST=$(curl -s "$SOURCE_URL" \
+            | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
+            | sort -V \
+            | tail -n 1)
+
+          CURRENT=$(cat music.txt 2>/dev/null || echo "")
+
+          echo "Latest Music version : $LATEST"
+          echo "Current Music version: $CURRENT"
+
+          if [ -n "$LATEST" ] && [ "$LATEST" != "$CURRENT" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -------------------------------------------------
+      # Trigger YouTube sync workflow
+      # -------------------------------------------------
+      - name: Trigger YouTube sync
+        if: steps.youtube.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run sync_youtube.yml
+
+      # -------------------------------------------------
+      # Trigger Music sync workflow
+      # -------------------------------------------------
+      - name: Trigger Music sync
+        if: steps.music.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run sync_music.yml
