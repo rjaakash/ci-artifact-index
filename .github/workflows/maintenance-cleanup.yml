@@ -1,13 +1,23 @@
 name: Repository Maintenance Cleanup
 
 on:
+  # -------------------------------------------------
+  # Scheduled maintenance run
+  # Executes every day at 00:00 UTC
+  # -------------------------------------------------
   schedule:
     - cron: "0 0 * * *"
 
+  # -------------------------------------------------
+  # Allows manual execution from GitHub UI
+  # -------------------------------------------------
   workflow_dispatch:
 
 permissions:
+  # Required to delete releases and tags
   contents: write
+
+  # Required to delete workflow runs
   actions: write
 
 jobs:
@@ -15,32 +25,61 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # =================================================
+      # Checkout repository
+      # =================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Cleanup releases (keep last YouTube + Music + Reddit)
+      # =================================================
+      # Release cleanup
+      # Keeps:
+      # - last YouTube
+      # - last Music
+      # - last Reddit
+      # Deletes everything else + tags
+      # =================================================
+      - name: Cleanup old releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
           export GH_TOKEN=$GH_TOKEN
 
-          gh release list --limit 200 --json tagName,createdAt \
+          gh release list --limit 100 --json tagName,createdAt \
             -q '.[] | "\(.tagName)|\(.createdAt)"' \
             | sort -t'|' -k2 -r > releases.txt
 
-          KEEP_YOUTUBE=$(grep '^YouTube-' releases.txt | head -n1 | cut -d'|' -f1 || true)
-          KEEP_MUSIC=$(grep '^Music-' releases.txt | head -n1 | cut -d'|' -f1 || true)
-          KEEP_REDDIT=$(grep '^Reddit-' releases.txt | head -n1 | cut -d'|' -f1 || true)
+          KEEP_YT=$(grep -m1 "youtube" releases.txt | cut -d'|' -f1 || true)
+          KEEP_MUSIC=$(grep -m1 "music" releases.txt | cut -d'|' -f1 || true)
+          KEEP_REDDIT=$(grep -m1 "reddit" releases.txt | cut -d'|' -f1 || true)
 
           echo "Keeping:"
-          echo "$KEEP_YOUTUBE"
+          echo "$KEEP_YT"
           echo "$KEEP_MUSIC"
           echo "$KEEP_REDDIT"
 
           cat releases.txt | while IFS='|' read -r TAG DATE; do
-            if [ "$TAG" != "$KEEP_YOUTUBE" ] && [ "$TAG" != "$KEEP_MUSIC" ] && [ "$TAG" != "$KEEP_REDDIT" ]; then
+            if [ "$TAG" != "$KEEP_YT" ] && [ "$TAG" != "$KEEP_MUSIC" ] && [ "$TAG" != "$KEEP_REDDIT" ]; then
               echo "Deleting release + tag: $TAG"
               gh release delete "$TAG" --yes || true
               git push origin ":refs/tags/$TAG" || true
             fi
           done
+
+      # =================================================
+      # Workflow runs cleanup
+      # - Fetches up to 300 recent workflow runs
+      # - Keeps the latest 100 runs
+      # - Deletes all older runs
+      # =================================================
+      - name: Cleanup old workflow runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run list -L300 --json databaseId \
+            -q '.[].databaseId' \
+          | tail -n +101 \
+          | xargs -r -I ID gh api \
+            repos/$GITHUB_REPOSITORY/actions/runs/ID \
+            -X DELETE
