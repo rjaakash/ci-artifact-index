@@ -50,17 +50,17 @@ jobs:
             -q '.[] | "\(.tagName)|\(.createdAt)"' \
             | sort -t'|' -k2 -r > releases.txt
 
-          KEEP_YT=$(grep -m1 "youtube" releases.txt | cut -d'|' -f1 || true)
-          KEEP_MUSIC=$(grep -m1 "music" releases.txt | cut -d'|' -f1 || true)
-          KEEP_REDDIT=$(grep -m1 "reddit" releases.txt | cut -d'|' -f1 || true)
+          KEEP_YOUTUBE=$(grep -m1 "YouTube" releases.txt | cut -d'|' -f1 || true)
+          KEEP_MUSIC=$(grep -m1 "Music" releases.txt | cut -d'|' -f1 || true)
+          KEEP_REDDIT=$(grep -m1 "Reddit" releases.txt | cut -d'|' -f1 || true)
 
           echo "Keeping:"
-          echo "$KEEP_YT"
+          echo "$KEEP_YOUTUBE"
           echo "$KEEP_MUSIC"
           echo "$KEEP_REDDIT"
 
           cat releases.txt | while IFS='|' read -r TAG DATE; do
-            if [ "$TAG" != "$KEEP_YT" ] && [ "$TAG" != "$KEEP_MUSIC" ] && [ "$TAG" != "$KEEP_REDDIT" ]; then
+            if [ "$TAG" != "$KEEP_YOUTUBE" ] && [ "$TAG" != "$KEEP_MUSIC" ] && [ "$TAG" != "$KEEP_REDDIT" ]; then
               echo "Deleting release + tag: $TAG"
               gh release delete "$TAG" --yes || true
               git push origin ":refs/tags/$TAG" || true
