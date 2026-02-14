@@ -66,11 +66,11 @@ jobs:
           echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
 
       # ---------------------------------------
-      # Trigger notify.yml if changed
+      # Trigger Notify Workflow if changed
       # ---------------------------------------
       - name: Trigger Notify Workflow
         if: steps.compare.outputs.changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh workflow run notify.yml
+          gh workflow run "Notify Versions"
