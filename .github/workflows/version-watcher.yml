@@ -35,31 +35,31 @@ jobs:
 
           NEW_MORPHE_YT=$(echo "$MORPHE_JSON" | jq -r '
             .patches[]?
-            | .compatiblePackages?["com.google.android.youtube"]? 
+            | .compatiblePackages?["com.google.android.youtube"]?
             | .[]?
           ' | sort -V | tail -n 1)
 
           NEW_MORPHE_MUSIC=$(echo "$MORPHE_JSON" | jq -r '
             .patches[]?
-            | .compatiblePackages?["com.google.android.apps.youtube.music"]? 
+            | .compatiblePackages?["com.google.android.apps.youtube.music"]?
             | .[]?
           ' | sort -V | tail -n 1)
 
           NEW_MORPHE_REDDIT=$(echo "$MORPHE_JSON" | jq -r '
             .patches[]?
-            | .compatiblePackages?["com.reddit.frontpage"]? 
+            | .compatiblePackages?["com.reddit.frontpage"]?
             | .[]?
           ' | sort -V | tail -n 1)
 
           NEW_ANDDEA_YT=$(echo "$ANDDEA_JSON" | jq -r '
             .patches[]?
-            | .compatiblePackages?["com.google.android.youtube"]? 
+            | .compatiblePackages?["com.google.android.youtube"]?
             | .[]?
           ' | sort -V | tail -n 1)
 
           NEW_ANDDEA_MUSIC=$(echo "$ANDDEA_JSON" | jq -r '
             .patches[]?
-            | .compatiblePackages?["com.google.android.apps.youtube.music"]? 
+            | .compatiblePackages?["com.google.android.apps.youtube.music"]?
             | .[]?
           ' | sort -V | tail -n 1)
 
@@ -70,7 +70,7 @@ jobs:
           echo "NEW_ANDDEA_MUSIC=$NEW_ANDDEA_MUSIC" >> $GITHUB_ENV
 
       # -------------------------------------------------
-      # STEP 2 — Compare with versions.txt
+      # STEP 2 — Compare with versions.txt (SAFE)
       # -------------------------------------------------
       - name: Compare with versions.txt
         id: compare
@@ -91,7 +91,11 @@ jobs:
             exit 0
           fi
 
-          source versions.txt
+          MORPHE_YT=$(grep '^MORPHE_YT=' versions.txt | cut -d= -f2 || true)
+          MORPHE_MUSIC=$(grep '^MORPHE_MUSIC=' versions.txt | cut -d= -f2 || true)
+          MORPHE_REDDIT=$(grep '^MORPHE_REDDIT=' versions.txt | cut -d= -f2 || true)
+          ANDDEA_YT=$(grep '^ANDDEA_YT=' versions.txt | cut -d= -f2 || true)
+          ANDDEA_MUSIC=$(grep '^ANDDEA_MUSIC=' versions.txt | cut -d= -f2 || true)
 
           echo "---- OLD VALUES ----"
           echo "MORPHE_YT=$MORPHE_YT"
@@ -110,11 +114,10 @@ jobs:
           [ "$NEW_ANDDEA_MUSIC" != "$ANDDEA_MUSIC" ] && CHANGED=true
 
           echo "CHANGED=$CHANGED"
-
           echo "changed=$CHANGED" >> $GITHUB_OUTPUT
 
       # -------------------------------------------------
-      # STEP 3 — Trigger notify.yml if mismatch
+      # STEP 3 — Trigger notify.yml only if mismatch
       # -------------------------------------------------
       - name: Trigger notify workflow
         if: steps.compare.outputs.changed == 'true'
