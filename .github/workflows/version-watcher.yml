@@ -18,52 +18,48 @@ jobs:
         uses: actions/checkout@v4
 
       # -------------------------------------------------
-      # STEP 1 — Fetch latest versions from patches JSON
+      # STEP 1 — Fetch latest compatible versions
       # -------------------------------------------------
-      - name: Fetch latest compatible versions
-        id: fetch
+      - name: Fetch latest versions
         run: |
           set -e
 
-          SOURCE_URL="PUT_YOUR_PATCHES_JSON_LINK_HERE"
+          MORPHE_SOURCE="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
+          ANDDEA_SOURCE="https://raw.githubusercontent.com/anddea/revanced-patches/dev/patches-list.json"
 
-          JSON=$(curl -s "$SOURCE_URL")
+          MORPHE_JSON=$(curl -s "$MORPHE_SOURCE")
+          ANDDEA_JSON=$(curl -s "$ANDDEA_SOURCE")
 
-          MORPHE_YT=$(echo "$JSON" | jq -r '
-            (.patches[]? 
-              | .compatiblePackages?["com.google.android.youtube"]? 
-              | .[]?) // empty
+          MORPHE_YT=$(echo "$MORPHE_JSON" | jq -r '
+            .patches[]?
+            | .compatiblePackages?["com.google.android.youtube"]?[]?
           ' | sort -V | tail -n 1)
 
-          MORPHE_MUSIC=$(echo "$JSON" | jq -r '
-            (.patches[]? 
-              | .compatiblePackages?["com.google.android.apps.youtube.music"]? 
-              | .[]?) // empty
+          MORPHE_MUSIC=$(echo "$MORPHE_JSON" | jq -r '
+            .patches[]?
+            | .compatiblePackages?["com.google.android.apps.youtube.music"]?[]?
           ' | sort -V | tail -n 1)
 
-          MORPHE_REDDIT=$(echo "$JSON" | jq -r '
-            (.patches[]? 
-              | .compatiblePackages?["com.reddit.frontpage"]? 
-              | .[]?) // empty
+          MORPHE_REDDIT=$(echo "$MORPHE_JSON" | jq -r '
+            .patches[]?
+            | .compatiblePackages?["com.reddit.frontpage"]?[]?
           ' | sort -V | tail -n 1)
 
-          ANDDEA_YT=$(echo "$JSON" | jq -r '
-            (.patches[]? 
-              | .compatiblePackages?["app.revanced.android.youtube"]? 
-              | .[]?) // empty
+          ANDDEA_YT=$(echo "$ANDDEA_JSON" | jq -r '
+            .patches[]?
+            | .compatiblePackages?["com.google.android.youtube"]?[]?
           ' | sort -V | tail -n 1)
 
-          ANDDEA_MUSIC=$(echo "$JSON" | jq -r '
-            (.patches[]? 
-              | .compatiblePackages?["app.revanced.android.youtube.music"]? 
-              | .[]?) // empty
+          ANDDEA_MUSIC=$(echo "$ANDDEA_JSON" | jq -r '
+            .patches[]?
+            | .compatiblePackages?["com.google.android.apps.youtube.music"]?[]?
           ' | sort -V | tail -n 1)
 
-          echo "MORPHE_YT=$MORPHE_YT" >> $GITHUB_ENV
-          echo "MORPHE_MUSIC=$MORPHE_MUSIC" >> $GITHUB_ENV
-          echo "MORPHE_REDDIT=$MORPHE_REDDIT" >> $GITHUB_ENV
-          echo "ANDDEA_YT=$ANDDEA_YT" >> $GITHUB_ENV
-          echo "ANDDEA_MUSIC=$ANDDEA_MUSIC" >> $GITHUB_ENV
+          echo "NEW_MORPHE_YT=$MORPHE_YT" >> $GITHUB_ENV
+          echo "NEW_MORPHE_MUSIC=$MORPHE_MUSIC" >> $GITHUB_ENV
+          echo "NEW_MORPHE_REDDIT=$MORPHE_REDDIT" >> $GITHUB_ENV
+          echo "NEW_ANDDEA_YT=$ANDDEA_YT" >> $GITHUB_ENV
+          echo "NEW_ANDDEA_MUSIC=$ANDDEA_MUSIC" >> $GITHUB_ENV
 
       # -------------------------------------------------
       # STEP 2 — Compare with versions.txt
@@ -82,19 +78,19 @@ jobs:
 
           CHANGED=false
 
-          [ "$MORPHE_YT" != "$MORPHE_YT" ] && CHANGED=true
-          [ "$MORPHE_MUSIC" != "$MORPHE_MUSIC" ] && CHANGED=true
-          [ "$MORPHE_REDDIT" != "$MORPHE_REDDIT" ] && CHANGED=true
-          [ "$ANDDEA_YT" != "$ANDDEA_YT" ] && CHANGED=true
-          [ "$ANDDEA_MUSIC" != "$ANDDEA_MUSIC" ] && CHANGED=true
+          [ "$NEW_MORPHE_YT" != "$MORPHE_YT" ] && CHANGED=true
+          [ "$NEW_MORPHE_MUSIC" != "$MORPHE_MUSIC" ] && CHANGED=true
+          [ "$NEW_MORPHE_REDDIT" != "$MORPHE_REDDIT" ] && CHANGED=true
+          [ "$NEW_ANDDEA_YT" != "$ANDDEA_YT" ] && CHANGED=true
+          [ "$NEW_ANDDEA_MUSIC" != "$ANDDEA_MUSIC" ] && CHANGED=true
 
           echo "changed=$CHANGED" >> $GITHUB_OUTPUT
 
       # -------------------------------------------------
-      # STEP 3 — Trigger notify.yml only if mismatch
+      # STEP 3 — Trigger notify.yml if changed
       # -------------------------------------------------
       - name: Trigger notify workflow
         if: steps.compare.outputs.changed == 'true'
-        run: gh workflow run notify.yml
+        run: gh workflow run "Notify Versions"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
