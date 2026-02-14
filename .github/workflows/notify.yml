@@ -11,61 +11,76 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # Step 1 — Define values
-      # (Replace these with your real detect step outputs later)
-      # -----------------------------
-      - name: Set version values
-        id: detect
+      - name: Resolve latest compatible versions
         run: |
-          echo "MORPHE_YT=test" >> $GITHUB_OUTPUT
-          echo "MORPHE_MUSIC=test" >> $GITHUB_OUTPUT
-          echo "MORPHE_REDDIT=test" >> $GITHUB_OUTPUT
-          echo "ANDDEA_YT=test" >> $GITHUB_OUTPUT
-          echo "ANDDEA_MUSIC=test" >> $GITHUB_OUTPUT
+          set -e
 
-      # -----------------------------
-      # Step 2 — Send Telegram message
-      # -----------------------------
-      - name: Send Telegram message
+          MORPHE_SOURCE="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
+          ANDDEA_SOURCE="https://raw.githubusercontent.com/anddea/revanced-patches/dev/patches-list.json"
+
+          MORPHE_YT=$(curl -s "$MORPHE_SOURCE" | jq -r '.patches[].compatiblePackages["com.google.android.youtube"]?[]' | sort -V | tail -n 1)
+          MORPHE_MUSIC=$(curl -s "$MORPHE_SOURCE" | jq -r '.patches[].compatiblePackages["com.google.android.apps.youtube.music"]?[]' | sort -V | tail -n 1)
+          MORPHE_REDDIT=$(curl -s "$MORPHE_SOURCE" | jq -r '.patches[].compatiblePackages["com.reddit.frontpage"]?[]' | sort -V | tail -n 1)
+
+          ANDDEA_YT=$(curl -s "$ANDDEA_SOURCE" | jq -r '.patches[].compatiblePackages["com.google.android.youtube"]?[]' | sort -V | tail -n 1)
+          ANDDEA_MUSIC=$(curl -s "$ANDDEA_SOURCE" | jq -r '.patches[].compatiblePackages["com.google.android.apps.youtube.music"]?[]' | sort -V | tail -n 1)
+
+          echo "MORPHE_YT=$MORPHE_YT" >> $GITHUB_ENV
+          echo "MORPHE_MUSIC=$MORPHE_MUSIC" >> $GITHUB_ENV
+          echo "MORPHE_REDDIT=$MORPHE_REDDIT" >> $GITHUB_ENV
+          echo "ANDDEA_YT=$ANDDEA_YT" >> $GITHUB_ENV
+          echo "ANDDEA_MUSIC=$ANDDEA_MUSIC" >> $GITHUB_ENV
+
+      - name: Build APKMirror links
+        run: |
+          YT_SLUG=$(echo "$MORPHE_YT" | tr '.' '-')
+          MUSIC_SLUG=$(echo "$MORPHE_MUSIC" | tr '.' '-')
+          REDDIT_SLUG=$(echo "$MORPHE_REDDIT" | tr '.' '-')
+
+          YT_LINK="https://www.apkmirror.com/apk/google-inc/youtube/youtube-${YT_SLUG}-release/"
+          MUSIC_LINK="https://www.apkmirror.com/apk/google-inc/youtube-music/youtube-music-${MUSIC_SLUG}-release/"
+          REDDIT_LINK="https://www.apkmirror.com/apk/redditinc/reddit/reddit-${REDDIT_SLUG}-release/"
+
+          echo "YT_LINK=$YT_LINK" >> $GITHUB_ENV
+          echo "MUSIC_LINK=$MUSIC_LINK" >> $GITHUB_ENV
+          echo "REDDIT_LINK=$REDDIT_LINK" >> $GITHUB_ENV
+
+      - name: Send Telegram notification
         env:
           BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
           TEXT="Version Update Detected"
           TEXT="$TEXT"$'\n\n'"Morphe:"
-          TEXT="$TEXT"$'\n'"YouTube: ${{ steps.detect.outputs.MORPHE_YT }}"
-          TEXT="$TEXT"$'\n'"Music: ${{ steps.detect.outputs.MORPHE_MUSIC }}"
-          TEXT="$TEXT"$'\n'"Reddit: ${{ steps.detect.outputs.MORPHE_REDDIT }}"
+          TEXT="$TEXT"$'\n'"YouTube: $MORPHE_YT"
+          TEXT="$TEXT"$'\n'"Music: $MORPHE_MUSIC"
+          TEXT="$TEXT"$'\n'"Reddit: $MORPHE_REDDIT"
           TEXT="$TEXT"$'\n\n'"Anddea:"
-          TEXT="$TEXT"$'\n'"YouTube: ${{ steps.detect.outputs.ANDDEA_YT }}"
-          TEXT="$TEXT"$'\n'"Music: ${{ steps.detect.outputs.ANDDEA_MUSIC }}"
+          TEXT="$TEXT"$'\n'"YouTube: $ANDDEA_YT"
+          TEXT="$TEXT"$'\n'"Music: $ANDDEA_MUSIC"
+          TEXT="$TEXT"$'\n\n'"Download Links:"
+          TEXT="$TEXT"$'\n'"YouTube: $YT_LINK"
+          TEXT="$TEXT"$'\n'"Music: $MUSIC_LINK"
+          TEXT="$TEXT"$'\n'"Reddit: $REDDIT_LINK"
 
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             -d chat_id="${CHAT_ID}" \
             --data-urlencode text="${TEXT}"
 
-      # -----------------------------
-      # Step 3 — Update versions.txt
-      # -----------------------------
       - name: Update versions.txt
         run: |
-          echo "MORPHE_YT=${{ steps.detect.outputs.MORPHE_YT }}" > versions.txt
-          echo "MORPHE_MUSIC=${{ steps.detect.outputs.MORPHE_MUSIC }}" >> versions.txt
-          echo "MORPHE_REDDIT=${{ steps.detect.outputs.MORPHE_REDDIT }}" >> versions.txt
-          echo "ANDDEA_YT=${{ steps.detect.outputs.ANDDEA_YT }}" >> versions.txt
-          echo "ANDDEA_MUSIC=${{ steps.detect.outputs.ANDDEA_MUSIC }}" >> versions.txt
+          {
+            echo "MORPHE_YT=$MORPHE_YT"
+            echo "MORPHE_MUSIC=$MORPHE_MUSIC"
+            echo "MORPHE_REDDIT=$MORPHE_REDDIT"
+            echo "ANDDEA_YT=$ANDDEA_YT"
+            echo "ANDDEA_MUSIC=$ANDDEA_MUSIC"
+          } > versions.txt
 
-          echo "----- versions.txt -----"
-          cat versions.txt
-
-      # -----------------------------
-      # Step 4 — Commit only if changed
-      # -----------------------------
-      - name: Commit changes to main
+      - name: Commit changes
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -73,9 +88,9 @@ jobs:
           git add versions.txt
 
           if git diff --cached --quiet; then
-            echo "No changes detected"
+            echo "No changes"
             exit 0
           fi
 
-          git commit -m "chore: update versions"
+          git commit -m "chore: update compatible versions"
           git push origin main
