@@ -11,9 +11,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # Step 1 — Define values
+      # (Replace these with your real detect step outputs later)
+      # -----------------------------
+      - name: Set version values
+        id: detect
+        run: |
+          echo "MORPHE_YT=test" >> $GITHUB_OUTPUT
+          echo "MORPHE_MUSIC=test" >> $GITHUB_OUTPUT
+          echo "MORPHE_REDDIT=test" >> $GITHUB_OUTPUT
+          echo "ANDDEA_YT=test" >> $GITHUB_OUTPUT
+          echo "ANDDEA_MUSIC=test" >> $GITHUB_OUTPUT
+
+      # -----------------------------
+      # Step 2 — Send Telegram message
+      # -----------------------------
       - name: Send Telegram message
         env:
           BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
@@ -21,22 +37,35 @@ jobs:
         run: |
           TEXT="Version Update Detected"
           TEXT="$TEXT"$'\n\n'"Morphe:"
-          TEXT="$TEXT"$'\n'"YouTube: test"
-          TEXT="$TEXT"$'\n'"Music: test"
-          TEXT="$TEXT"$'\n'"Reddit: test"
+          TEXT="$TEXT"$'\n'"YouTube: ${{ steps.detect.outputs.MORPHE_YT }}"
+          TEXT="$TEXT"$'\n'"Music: ${{ steps.detect.outputs.MORPHE_MUSIC }}"
+          TEXT="$TEXT"$'\n'"Reddit: ${{ steps.detect.outputs.MORPHE_REDDIT }}"
           TEXT="$TEXT"$'\n\n'"Anddea:"
-          TEXT="$TEXT"$'\n'"YouTube: test"
-          TEXT="$TEXT"$'\n'"Music: test"
+          TEXT="$TEXT"$'\n'"YouTube: ${{ steps.detect.outputs.ANDDEA_YT }}"
+          TEXT="$TEXT"$'\n'"Music: ${{ steps.detect.outputs.ANDDEA_MUSIC }}"
 
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             -d chat_id="${CHAT_ID}" \
             --data-urlencode text="${TEXT}"
 
+      # -----------------------------
+      # Step 3 — Update versions.txt
+      # -----------------------------
       - name: Update versions.txt
         run: |
-          echo "TEST=1" > versions.txt
+          echo "MORPHE_YT=${{ steps.detect.outputs.MORPHE_YT }}" > versions.txt
+          echo "MORPHE_MUSIC=${{ steps.detect.outputs.MORPHE_MUSIC }}" >> versions.txt
+          echo "MORPHE_REDDIT=${{ steps.detect.outputs.MORPHE_REDDIT }}" >> versions.txt
+          echo "ANDDEA_YT=${{ steps.detect.outputs.ANDDEA_YT }}" >> versions.txt
+          echo "ANDDEA_MUSIC=${{ steps.detect.outputs.ANDDEA_MUSIC }}" >> versions.txt
 
-      - name: Commit changes
+          echo "----- versions.txt -----"
+          cat versions.txt
+
+      # -----------------------------
+      # Step 4 — Commit only if changed
+      # -----------------------------
+      - name: Commit changes to main
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -44,7 +73,7 @@ jobs:
           git add versions.txt
 
           if git diff --cached --quiet; then
-            echo "No changes"
+            echo "No changes detected"
             exit 0
           fi
 
