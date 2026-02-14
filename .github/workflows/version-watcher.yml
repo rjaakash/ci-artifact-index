@@ -1,18 +1,12 @@
 name: Version Watcher
 
 on:
-  # -------------------------------------------------
   # Manual trigger
-  # -------------------------------------------------
   workflow_dispatch:
 
-  # -------------------------------------------------
-  # Scheduled trigger
-  #
-  # Runs daily at 06:09 UTC
-  # -------------------------------------------------
+  # Scheduled trigger (Runs daily at 22:00 UTC)
   schedule:
-    - cron: "9 6 * * *"
+    - cron: "0 22 * * *"
 
 permissions:
   contents: read
@@ -25,150 +19,92 @@ jobs:
     steps:
       # -------------------------------------------------
       # Checkout repository
-      #
-      # Required to read version tracking files
+      # Required to read versions.txt
       # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # =================================================
-      # MORPHE SECTION
-      # =================================================
-
-      - name: Resolve YouTube version from Morphe patches
-        id: youtube
+      # -------------------------------------------------
+      # Resolve latest compatible versions (Morphe + Anddea)
+      # -------------------------------------------------
+      - name: Resolve latest compatible versions
+        id: resolve
         run: |
           set -e
-          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
 
-          LATEST=$(curl -s "$SOURCE_URL" | jq -r '
-              .patches[]
-              | .compatiblePackages["com.google.android.youtube"]? // empty
-              | .[]
-            ' | sort -V | tail -n 1)
+          # ---------------------------
+          # MORPHE SOURCE
+          # ---------------------------
+          MORPHE_SOURCE="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
 
-          CURRENT=$(cat youtube.txt 2>/dev/null || echo "")
+          MORPHE_YT=$(curl -s "$MORPHE_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.google.android.youtube"]? // empty
+            | .[]
+          ' | sort -V | tail -n 1)
 
-          if [ -n "$LATEST" ] && [ "$LATEST" != "$CURRENT" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
+          MORPHE_MUSIC=$(curl -s "$MORPHE_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.google.android.apps.youtube.music"]? // empty
+            | .[]
+          ' | sort -V | tail -n 1)
 
-      - name: Resolve Music version from Morphe patches
-        id: music
+          MORPHE_REDDIT=$(curl -s "$MORPHE_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.reddit.frontpage"]? // empty
+            | .[]
+          ' | sort -V | tail -n 1)
+
+          # ---------------------------
+          # ANDDEA SOURCE
+          # ---------------------------
+          ANDDEA_SOURCE="https://raw.githubusercontent.com/anddea/revanced-patches/dev/patches-list.json"
+
+          ANDDEA_YT=$(curl -s "$ANDDEA_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.google.android.youtube"]? // empty
+            | .[]
+          ' | sort -V | tail -n 1)
+
+          ANDDEA_MUSIC=$(curl -s "$ANDDEA_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.google.android.apps.youtube.music"]? // empty
+            | .[]
+          ' | sort -V | tail -n 1)
+
+          echo "MORPHE_YT=$MORPHE_YT" >> $GITHUB_ENV
+          echo "MORPHE_MUSIC=$MORPHE_MUSIC" >> $GITHUB_ENV
+          echo "MORPHE_REDDIT=$MORPHE_REDDIT" >> $GITHUB_ENV
+          echo "ANDDEA_YT=$ANDDEA_YT" >> $GITHUB_ENV
+          echo "ANDDEA_MUSIC=$ANDDEA_MUSIC" >> $GITHUB_ENV
+
+      # -------------------------------------------------
+      # Compare with versions.txt
+      # -------------------------------------------------
+      - name: Compare with stored versions
+        id: compare
         run: |
           set -e
-          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
 
-          LATEST=$(curl -s "$SOURCE_URL" | jq -r '
-              .patches[]
-              | .compatiblePackages["com.google.android.apps.youtube.music"]? // empty
-              | .[]
-            ' | sort -V | tail -n 1)
+          # Load current stored values (if file missing, treat as empty)
+          source versions.txt 2>/dev/null || true
 
-          CURRENT=$(cat music.txt 2>/dev/null || echo "")
+          CHANGED=false
 
-          if [ -n "$LATEST" ] && [ "$LATEST" != "$CURRENT" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
+          if [ "$MORPHE_YT" != "${MORPHE_YT:-}" ]; then CHANGED=true; fi
+          if [ "$MORPHE_MUSIC" != "${MORPHE_MUSIC:-}" ]; then CHANGED=true; fi
+          if [ "$MORPHE_REDDIT" != "${MORPHE_REDDIT:-}" ]; then CHANGED=true; fi
+          if [ "$ANDDEA_YT" != "${ANDDEA_YT:-}" ]; then CHANGED=true; fi
+          if [ "$ANDDEA_MUSIC" != "${ANDDEA_MUSIC:-}" ]; then CHANGED=true; fi
 
-      - name: Resolve Reddit version from Morphe patches
-        id: reddit
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------
+      # Trigger notify workflow if changed
+      # -------------------------------------------------
+      - name: Trigger notify workflow
+        if: steps.compare.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
-          SOURCE_URL="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
-
-          LATEST=$(curl -s "$SOURCE_URL" | jq -r '
-              .patches[]
-              | .compatiblePackages["com.reddit.frontpage"]? // empty
-              | .[]
-            ' | sort -V | tail -n 1)
-
-          CURRENT=$(cat reddit.txt 2>/dev/null || echo "")
-
-          if [ -n "$LATEST" ] && [ "$LATEST" != "$CURRENT" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # =================================================
-      # ANDDEA SECTION
-      # =================================================
-
-      - name: Resolve YouTube version from Anddea patches
-        id: youtube_anddea
-        run: |
-          set -e
-          SOURCE_URL="https://raw.githubusercontent.com/anddea/revanced-patches/dev/patches-list.json"
-
-          LATEST=$(curl -s "$SOURCE_URL" | jq -r '
-              .patches[]
-              | .compatiblePackages["com.google.android.youtube"]? // empty
-              | .[]
-            ' | sort -V | tail -n 1)
-
-          CURRENT=$(cat youtube-anddea.txt 2>/dev/null || echo "")
-
-          if [ -n "$LATEST" ] && [ "$LATEST" != "$CURRENT" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Resolve Music version from Anddea patches
-        id: music_anddea
-        run: |
-          set -e
-          SOURCE_URL="https://raw.githubusercontent.com/anddea/revanced-patches/dev/patches-list.json"
-
-          LATEST=$(curl -s "$SOURCE_URL" | jq -r '
-              .patches[]
-              | .compatiblePackages["com.google.android.apps.youtube.music"]? // empty
-              | .[]
-            ' | sort -V | tail -n 1)
-
-          CURRENT=$(cat music-anddea.txt 2>/dev/null || echo "")
-
-          if [ -n "$LATEST" ] && [ "$LATEST" != "$CURRENT" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # =================================================
-      # TRIGGERS
-      # =================================================
-
-      - name: Trigger YouTube sync
-        if: steps.youtube.outputs.changed == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run sync_youtube.yml
-
-      - name: Trigger Music sync
-        if: steps.music.outputs.changed == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run sync_music.yml
-
-      - name: Trigger Reddit sync
-        if: steps.reddit.outputs.changed == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run sync_reddit.yml
-
-      - name: Trigger YouTube Anddea sync
-        if: steps.youtube_anddea.outputs.changed == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run sync_youtube_anddea.yml
-
-      - name: Trigger Music Anddea sync
-        if: steps.music_anddea.outputs.changed == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run sync_music_anddea.yml
+          gh workflow run notify.yml
