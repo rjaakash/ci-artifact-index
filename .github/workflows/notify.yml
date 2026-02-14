@@ -1,7 +1,11 @@
 name: Notify Versions
 
 on:
+  # Manual run only
   workflow_dispatch:
+
+  # Allow watcher to trigger
+  workflow_call:
 
 permissions:
   contents: write
@@ -11,15 +15,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # =============================================
-      # Checkout repository
-      # =============================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # =============================================
-      # Resolve latest compatible versions
-      # =============================================
       - name: Resolve latest compatible versions
         run: |
           set -e
@@ -40,9 +38,6 @@ jobs:
           echo "ANDDEA_YT=$ANDDEA_YT" >> $GITHUB_ENV
           echo "ANDDEA_MUSIC=$ANDDEA_MUSIC" >> $GITHUB_ENV
 
-      # =============================================
-      # Build APKMirror direct links
-      # =============================================
       - name: Build APKMirror links
         run: |
           YT_SLUG=$(echo "$MORPHE_YT" | tr '.' '-')
@@ -53,15 +48,12 @@ jobs:
           echo "MUSIC_LINK=https://www.apkmirror.com/apk/google-inc/youtube-music/youtube-music-${MUSIC_SLUG}-release/" >> $GITHUB_ENV
           echo "REDDIT_LINK=https://www.apkmirror.com/apk/redditinc/reddit/reddit-${REDDIT_SLUG}-release/" >> $GITHUB_ENV
 
-      # =============================================
-      # Send Telegram notification
-      # =============================================
       - name: Send Telegram notification
         env:
           BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          MESSAGE="🚀 Version Update
+          MESSAGE="Version Update
 
 Morphe:
 YouTube: $MORPHE_YT
@@ -72,7 +64,7 @@ Anddea:
 YouTube: $ANDDEA_YT
 Music: $ANDDEA_MUSIC
 
-Download Links:
+Links:
 YouTube: $YT_LINK
 Music: $MUSIC_LINK
 Reddit: $REDDIT_LINK
@@ -82,9 +74,6 @@ Reddit: $REDDIT_LINK
             -d chat_id="$CHAT_ID" \
             -d text="$MESSAGE"
 
-      # =============================================
-      # Update versions.txt
-      # =============================================
       - name: Update versions.txt
         run: |
           {
@@ -95,9 +84,6 @@ Reddit: $REDDIT_LINK
             echo "ANDDEA_MUSIC=$ANDDEA_MUSIC"
           } > versions.txt
 
-      # =============================================
-      # Commit updated versions.txt
-      # =============================================
       - name: Commit updated versions
         run: |
           git config user.name "github-actions"
@@ -109,7 +95,5 @@ Reddit: $REDDIT_LINK
             exit 0
           fi
 
-          MSG="chore: update versions — Morphe YT $MORPHE_YT | Music $MORPHE_MUSIC | Reddit $MORPHE_REDDIT | Anddea YT $ANDDEA_YT | Music $ANDDEA_MUSIC"
-
-          git commit -m "$MSG"
+          git commit -m "chore: update versions"
           git push
