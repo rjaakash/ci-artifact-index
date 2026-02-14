@@ -15,9 +15,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
       - name: Resolve latest compatible versions
         run: |
           set -e
@@ -53,7 +50,7 @@ jobs:
           BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          MESSAGE="Version Update Detected
+          MESSAGE="🚀 Version Update Detected
 
 Morphe:
 YouTube: $MORPHE_YT
