@@ -1,10 +1,7 @@
 name: Notify Versions
 
 on:
-  # Manual run only
   workflow_dispatch:
-
-  # Allow watcher to trigger
   workflow_call:
 
 permissions:
@@ -38,22 +35,13 @@ jobs:
           echo "ANDDEA_YT=$ANDDEA_YT" >> $GITHUB_ENV
           echo "ANDDEA_MUSIC=$ANDDEA_MUSIC" >> $GITHUB_ENV
 
-      - name: Build APKMirror links
-        run: |
-          YT_SLUG=$(echo "$MORPHE_YT" | tr '.' '-')
-          MUSIC_SLUG=$(echo "$MORPHE_MUSIC" | tr '.' '-')
-          REDDIT_SLUG=$(echo "$MORPHE_REDDIT" | tr '.' '-')
-
-          echo "YT_LINK=https://www.apkmirror.com/apk/google-inc/youtube/youtube-${YT_SLUG}-release/" >> $GITHUB_ENV
-          echo "MUSIC_LINK=https://www.apkmirror.com/apk/google-inc/youtube-music/youtube-music-${MUSIC_SLUG}-release/" >> $GITHUB_ENV
-          echo "REDDIT_LINK=https://www.apkmirror.com/apk/redditinc/reddit/reddit-${REDDIT_SLUG}-release/" >> $GITHUB_ENV
-
       - name: Send Telegram notification
         env:
           BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          MESSAGE="Version Update
+          TEXT=$(cat <<EOF
+Version Update
 
 Morphe:
 YouTube: $MORPHE_YT
@@ -63,16 +51,12 @@ Reddit: $MORPHE_REDDIT
 Anddea:
 YouTube: $ANDDEA_YT
 Music: $ANDDEA_MUSIC
-
-Links:
-YouTube: $YT_LINK
-Music: $MUSIC_LINK
-Reddit: $REDDIT_LINK
-"
+EOF
+)
 
           curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
             -d chat_id="$CHAT_ID" \
-            -d text="$MESSAGE"
+            -d text="$TEXT"
 
       - name: Update versions.txt
         run: |
