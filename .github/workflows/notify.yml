@@ -24,12 +24,40 @@ jobs:
           MORPHE_SOURCE="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
           ANDDEA_SOURCE="https://raw.githubusercontent.com/anddea/revanced-patches/dev/patches-list.json"
 
-          MORPHE_YT=$(curl -s "$MORPHE_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.youtube"]? | select(type=="array") | .[]' | sort -V | tail -n1)
-          MORPHE_MUSIC=$(curl -s "$MORPHE_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.apps.youtube.music"]? | select(type=="array") | .[]' | sort -V | tail -n1)
-          MORPHE_REDDIT=$(curl -s "$MORPHE_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.reddit.frontpage"]? | select(type=="array") | .[]' | sort -V | tail -n1)
+          MORPHE_YT=$(curl -s "$MORPHE_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.google.android.youtube"]?
+            | select(type=="array")
+            | .[]
+          ' | sort -V | tail -n 1)
 
-          ANDDEA_YT=$(curl -s "$ANDDEA_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.youtube"]? | select(type=="array") | .[]' | sort -V | tail -n1)
-          ANDDEA_MUSIC=$(curl -s "$ANDDEA_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.apps.youtube.music"]? | select(type=="array") | .[]' | sort -V | tail -n1)
+          MORPHE_MUSIC=$(curl -s "$MORPHE_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.google.android.apps.youtube.music"]?
+            | select(type=="array")
+            | .[]
+          ' | sort -V | tail -n 1)
+
+          MORPHE_REDDIT=$(curl -s "$MORPHE_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.reddit.frontpage"]?
+            | select(type=="array")
+            | .[]
+          ' | sort -V | tail -n 1)
+
+          ANDDEA_YT=$(curl -s "$ANDDEA_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.google.android.youtube"]?
+            | select(type=="array")
+            | .[]
+          ' | sort -V | tail -n 1)
+
+          ANDDEA_MUSIC=$(curl -s "$ANDDEA_SOURCE" | jq -r '
+            .patches[]
+            | .compatiblePackages["com.google.android.apps.youtube.music"]?
+            | select(type=="array")
+            | .[]
+          ' | sort -V | tail -n 1)
 
           echo "MORPHE_YT=$MORPHE_YT" >> $GITHUB_ENV
           echo "MORPHE_MUSIC=$MORPHE_MUSIC" >> $GITHUB_ENV
@@ -38,64 +66,74 @@ jobs:
           echo "ANDDEA_MUSIC=$ANDDEA_MUSIC" >> $GITHUB_ENV
 
       # -------------------------------------------------
-      # Build APKMirror links (FIXED)
+      # Build APKMirror links (for BOTH sources)
       # -------------------------------------------------
       - name: Build links
         run: |
-          build_link () {
-            VERSION="$1"
-            BASE="$2"
-            if [ -n "$VERSION" ]; then
-              SLUG=$(echo "$VERSION" | tr '.' '-')
-              echo "${BASE}-${SLUG}-release/"
-            fi
-          }
 
-          MORPHE_YT_LINK=$(build_link "$MORPHE_YT" "https://www.apkmirror.com/apk/google-inc/youtube/youtube")
-          MORPHE_MUSIC_LINK=$(build_link "$MORPHE_MUSIC" "https://www.apkmirror.com/apk/google-inc/youtube-music/youtube-music")
-          MORPHE_REDDIT_LINK=$(build_link "$MORPHE_REDDIT" "https://www.apkmirror.com/apk/redditinc/reddit/reddit")
+          if [ -n "$MORPHE_YT" ]; then
+            SLUG=$(echo "$MORPHE_YT" | tr '.' '-')
+            MORPHE_YT_LINK="https://www.apkmirror.com/apk/google-inc/youtube/youtube-${SLUG}-release/"
+            echo "MORPHE_YT_LINK=$MORPHE_YT_LINK" >> $GITHUB_ENV
+          fi
 
-          ANDDEA_YT_LINK=$(build_link "$ANDDEA_YT" "https://www.apkmirror.com/apk/google-inc/youtube/youtube")
-          ANDDEA_MUSIC_LINK=$(build_link "$ANDDEA_MUSIC" "https://www.apkmirror.com/apk/google-inc/youtube-music/youtube-music")
+          if [ -n "$MORPHE_MUSIC" ]; then
+            SLUG=$(echo "$MORPHE_MUSIC" | tr '.' '-')
+            MORPHE_MUSIC_LINK="https://www.apkmirror.com/apk/google-inc/youtube-music/youtube-music-${SLUG}-release/"
+            echo "MORPHE_MUSIC_LINK=$MORPHE_MUSIC_LINK" >> $GITHUB_ENV
+          fi
 
-          echo "MORPHE_YT_LINK=$MORPHE_YT_LINK" >> $GITHUB_ENV
-          echo "MORPHE_MUSIC_LINK=$MORPHE_MUSIC_LINK" >> $GITHUB_ENV
-          echo "MORPHE_REDDIT_LINK=$MORPHE_REDDIT_LINK" >> $GITHUB_ENV
-          echo "ANDDEA_YT_LINK=$ANDDEA_YT_LINK" >> $GITHUB_ENV
-          echo "ANDDEA_MUSIC_LINK=$ANDDEA_MUSIC_LINK" >> $GITHUB_ENV
+          if [ -n "$MORPHE_REDDIT" ]; then
+            SLUG=$(echo "$MORPHE_REDDIT" | tr '.' '-')
+            MORPHE_REDDIT_LINK="https://www.apkmirror.com/apk/redditinc/reddit/reddit-${SLUG}-release/"
+            echo "MORPHE_REDDIT_LINK=$MORPHE_REDDIT_LINK" >> $GITHUB_ENV
+          fi
+
+          if [ -n "$ANDDEA_YT" ]; then
+            SLUG=$(echo "$ANDDEA_YT" | tr '.' '-')
+            ANDDEA_YT_LINK="https://www.apkmirror.com/apk/google-inc/youtube/youtube-${SLUG}-release/"
+            echo "ANDDEA_YT_LINK=$ANDDEA_YT_LINK" >> $GITHUB_ENV
+          fi
+
+          if [ -n "$ANDDEA_MUSIC" ]; then
+            SLUG=$(echo "$ANDDEA_MUSIC" | tr '.' '-')
+            ANDDEA_MUSIC_LINK="https://www.apkmirror.com/apk/google-inc/youtube-music/youtube-music-${SLUG}-release/"
+            echo "ANDDEA_MUSIC_LINK=$ANDDEA_MUSIC_LINK" >> $GITHUB_ENV
+          fi
 
       # -------------------------------------------------
-      # Send Telegram (Preview Disabled)
+      # Send Telegram Notification
       # -------------------------------------------------
       - name: Send Telegram
         env:
           BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
+
           TEXT="Version Update Detected"
 
-          TEXT="$TEXT"$'\n\nMorphe:'
-          TEXT="$TEXT"$'\nYouTube: ${MORPHE_YT:-N/A}'
-          TEXT="$TEXT"$'\nMusic: ${MORPHE_MUSIC:-N/A}'
-          TEXT="$TEXT"$'\nReddit: ${MORPHE_REDDIT:-N/A}'
+          TEXT="${TEXT}\n\nMorphe:"
+          TEXT="${TEXT}\nYouTube: ${MORPHE_YT:-N/A}"
+          TEXT="${TEXT}\nMusic: ${MORPHE_MUSIC:-N/A}"
+          TEXT="${TEXT}\nReddit: ${MORPHE_REDDIT:-N/A}"
 
-          TEXT="$TEXT"$'\n\nAnddea:'
-          TEXT="$TEXT"$'\nYouTube: ${ANDDEA_YT:-N/A}'
-          TEXT="$TEXT"$'\nMusic: ${ANDDEA_MUSIC:-N/A}'
+          TEXT="${TEXT}\n\nAnddea:"
+          TEXT="${TEXT}\nYouTube: ${ANDDEA_YT:-N/A}"
+          TEXT="${TEXT}\nMusic: ${ANDDEA_MUSIC:-N/A}"
 
-          TEXT="$TEXT"$'\n\nDownload Links:'
+          TEXT="${TEXT}\n\nDownload Links:"
 
-          [ -n "$MORPHE_YT_LINK" ] && TEXT="$TEXT"$'\nMorphe YT: '"$MORPHE_YT_LINK"
-          [ -n "$MORPHE_MUSIC_LINK" ] && TEXT="$TEXT"$'\nMorphe Music: '"$MORPHE_MUSIC_LINK"
-          [ -n "$MORPHE_REDDIT_LINK" ] && TEXT="$TEXT"$'\nMorphe Reddit: '"$MORPHE_REDDIT_LINK"
+          [ -n "$MORPHE_YT_LINK" ] && TEXT="${TEXT}\nMorphe YT: $MORPHE_YT_LINK"
+          [ -n "$MORPHE_MUSIC_LINK" ] && TEXT="${TEXT}\nMorphe Music: $MORPHE_MUSIC_LINK"
+          [ -n "$MORPHE_REDDIT_LINK" ] && TEXT="${TEXT}\nMorphe Reddit: $MORPHE_REDDIT_LINK"
 
-          [ -n "$ANDDEA_YT_LINK" ] && TEXT="$TEXT"$'\nAnddea YT: '"$ANDDEA_YT_LINK"
-          [ -n "$ANDDEA_MUSIC_LINK" ] && TEXT="$TEXT"$'\nAnddea Music: '"$ANDDEA_MUSIC_LINK"
+          [ -n "$ANDDEA_YT_LINK" ] && TEXT="${TEXT}\nAnddea YT: $ANDDEA_YT_LINK"
+          [ -n "$ANDDEA_MUSIC_LINK" ] && TEXT="${TEXT}\nAnddea Music: $ANDDEA_MUSIC_LINK"
 
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             -d chat_id="${CHAT_ID}" \
             -d disable_web_page_preview=true \
-            --data-urlencode text="${TEXT}"
+            --data-urlencode text="$TEXT"
 
       # -------------------------------------------------
       # Update versions.txt
@@ -125,7 +163,7 @@ jobs:
             exit 0
           fi
 
-          MSG="chore: "
+          MSG="chore: update versions | "
 
           [ -n "$MORPHE_YT" ] && MSG="${MSG}Morphe YT ${MORPHE_YT} | "
           [ -n "$MORPHE_MUSIC" ] && MSG="${MSG}Morphe Music ${MORPHE_MUSIC} | "
