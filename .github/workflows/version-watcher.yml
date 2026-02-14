@@ -1,9 +1,11 @@
 name: Version Watcher
 
 on:
+  # Manual run from GitHub UI
   workflow_dispatch:
+
+  # 10:00 PM IST = 16:30 UTC
   schedule:
-    # 10:00 PM IST = 16:30 UTC
     - cron: "30 16 * * *"
 
 permissions:
@@ -15,17 +17,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # =============================================
-      # Checkout repository (needed for versions.txt)
-      # =============================================
+      # ---------------------------------------
+      # Checkout repository
+      # ---------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # =============================================
+      # ---------------------------------------
       # Resolve latest compatible versions
-      # =============================================
+      # ---------------------------------------
       - name: Resolve latest compatible versions
-        id: resolve
         run: |
           set -e
 
@@ -45,9 +46,9 @@ jobs:
           echo "NEW_ANDDEA_YT=$NEW_ANDDEA_YT" >> $GITHUB_ENV
           echo "NEW_ANDDEA_MUSIC=$NEW_ANDDEA_MUSIC" >> $GITHUB_ENV
 
-      # =============================================
-      # Compare with stored versions.txt
-      # =============================================
+      # ---------------------------------------
+      # Compare with versions.txt
+      # ---------------------------------------
       - name: Compare with stored versions
         id: compare
         run: |
@@ -70,10 +71,10 @@ jobs:
 
           echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
 
-      # =============================================
-      # Trigger notify.yml (by filename — same logic as build.yml repo)
-      # =============================================
-      - name: Trigger notify workflow
+      # ---------------------------------------
+      # Trigger notify.yml if changed
+      # ---------------------------------------
+      - name: Trigger Notify Workflow
         if: steps.compare.outputs.changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
