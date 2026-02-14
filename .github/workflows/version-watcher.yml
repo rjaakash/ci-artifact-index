@@ -1,11 +1,9 @@
 name: Version Watcher
 
 on:
-  # Manual run from GitHub UI
   workflow_dispatch:
-
-  # 10:00 PM IST = 16:30 UTC
   schedule:
+    # 10:00 PM IST = 16:30 UTC
     - cron: "30 16 * * *"
 
 permissions:
@@ -27,6 +25,7 @@ jobs:
       # Resolve latest compatible versions
       # ---------------------------------------
       - name: Resolve latest compatible versions
+        id: resolve
         run: |
           set -e
 
