@@ -2,15 +2,10 @@ name: Repository Hard Cleanup
 
 on:
   # Manual trigger ONLY
-  # This workflow is intentionally NOT scheduled
-  # Use with caution
   workflow_dispatch:
 
 permissions:
-  # Required to delete releases and tags
   contents: write
-
-  # Required to delete workflow runs
   actions: write
 
 jobs:
@@ -18,73 +13,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # =================================================
+      # -------------------------------------------------
       # Checkout repository
-      # (Not strictly required, but keeps repo context
-      #  available if needed)
-      # =================================================
+      # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # =================================================
-      # HARD release cleanup
-      # ⚠️ DESTRUCTIVE OPERATION
-      #
-      # - Deletes ALL GitHub releases
-      # - Deletes ALL associated Git tags
-      # - Intended for full repository reset
-      # =================================================
-      - name: Delete all releases and tags
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Deleting all releases..."
-          gh release list --limit 100 --json tagName -q '.[].tagName' \
-          | while read -r tag; do
-              echo "Deleting release and tag: $tag"
-              gh release delete "$tag" --yes || true
-              git push origin ":refs/tags/$tag" || true
-            done
-
-      # =================================================
+      # -------------------------------------------------
       # Reset version tracking files
-      #
-      # - Sets youtube.txt, music.txt, reddit.txt to 0
-      # - Commits the reset state
-      # =================================================
-      - name: Reset version files
+      # -------------------------------------------------
+      - name: Reset versions.txt to 0
         run: |
-          echo "0" > youtube.txt
-          echo "0" > music.txt
-          echo "0" > reddit.txt
+          echo "MORPHE_YT=0" > versions.txt
+          echo "MORPHE_MUSIC=0" >> versions.txt
+          echo "MORPHE_REDDIT=0" >> versions.txt
+          echo "ANDDEA_YT=0" >> versions.txt
+          echo "ANDDEA_MUSIC=0" >> versions.txt
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git add youtube.txt music.txt reddit.txt
+          git add versions.txt
 
           if git diff --cached --quiet; then
-            echo "No version reset needed"
+            echo "No changes to commit"
             exit 0
           fi
 
-          git commit -m "chore: hard reset version tracking"
-          git push
+          git commit -m "chore: reset version tracking to 0"
+          git push origin main
 
-      # =================================================
-      # HARD workflow runs cleanup
-      # ⚠️ DESTRUCTIVE OPERATION
-      #
-      # - Keeps ONLY the most recent workflow run
-      # - Deletes all older runs across all workflows
-      # =================================================
+      # -------------------------------------------------
+      # Delete old workflow runs (keep latest 1 only)
+      # -------------------------------------------------
       - name: Delete old workflow runs (keep 1)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh run list -L300 --json databaseId \
-            -q '.[].databaseId' \
+          echo "Fetching last 300 workflow runs..."
+
+          gh run list -L 300 --json databaseId,createdAt \
+            -q 'sort_by(.createdAt) | reverse | .[].databaseId' \
           | tail -n +2 \
-          | xargs -r -I ID gh api \
-            repos/$GITHUB_REPOSITORY/actions/runs/ID \
-            -X DELETE
+          | while read run_id; do
+              echo "Deleting workflow run ID: $run_id"
+              gh api repos/$GITHUB_REPOSITORY/actions/runs/$run_id -X DELETE
+            done
+
+          echo "Cleanup completed. Only latest workflow run kept."
