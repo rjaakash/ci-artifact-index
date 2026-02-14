@@ -11,78 +11,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve latest compatible versions
-        run: |
-          set -e
-
-          MORPHE_SOURCE="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-list.json"
-          ANDDEA_SOURCE="https://raw.githubusercontent.com/anddea/revanced-patches/dev/patches-list.json"
-
-          MORPHE_YT=$(curl -s "$MORPHE_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.youtube"]? // empty | .[]' | sort -V | tail -n 1)
-          MORPHE_MUSIC=$(curl -s "$MORPHE_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.apps.youtube.music"]? // empty | .[]' | sort -V | tail -n 1)
-          MORPHE_REDDIT=$(curl -s "$MORPHE_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.reddit.frontpage"]? // empty | .[]' | sort -V | tail -n 1)
-
-          ANDDEA_YT=$(curl -s "$ANDDEA_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.youtube"]? // empty | .[]' | sort -V | tail -n 1)
-          ANDDEA_MUSIC=$(curl -s "$ANDDEA_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.apps.youtube.music"]? // empty | .[]' | sort -V | tail -n 1)
-
-          echo "MORPHE_YT=$MORPHE_YT" >> $GITHUB_ENV
-          echo "MORPHE_MUSIC=$MORPHE_MUSIC" >> $GITHUB_ENV
-          echo "MORPHE_REDDIT=$MORPHE_REDDIT" >> $GITHUB_ENV
-          echo "ANDDEA_YT=$ANDDEA_YT" >> $GITHUB_ENV
-          echo "ANDDEA_MUSIC=$ANDDEA_MUSIC" >> $GITHUB_ENV
-
-      - name: Build APKMirror links
-        run: |
-          YT_SLUG=$(echo "$MORPHE_YT" | tr '.' '-')
-          MUSIC_SLUG=$(echo "$MORPHE_MUSIC" | tr '.' '-')
-          REDDIT_SLUG=$(echo "$MORPHE_REDDIT" | tr '.' '-')
-
-          echo "YT_LINK=https://www.apkmirror.com/apk/google-inc/youtube/youtube-${YT_SLUG}-release/" >> $GITHUB_ENV
-          echo "MUSIC_LINK=https://www.apkmirror.com/apk/google-inc/youtube-music/youtube-music-${MUSIC_SLUG}-release/" >> $GITHUB_ENV
-          echo "REDDIT_LINK=https://www.apkmirror.com/apk/redditinc/reddit/reddit-${REDDIT_SLUG}-release/" >> $GITHUB_ENV
-
-      - name: Send Telegram notification
+      - name: Send Telegram message
         env:
           BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          TEXT=$(cat <<EOF
-Version Update Detected
+          TEXT="Version Update Detected"
+          TEXT="$TEXT"$'\n\n'"Morphe:"
+          TEXT="$TEXT"$'\n'"YouTube: test"
+          TEXT="$TEXT"$'\n'"Music: test"
+          TEXT="$TEXT"$'\n'"Reddit: test"
+          TEXT="$TEXT"$'\n\n'"Anddea:"
+          TEXT="$TEXT"$'\n'"YouTube: test"
+          TEXT="$TEXT"$'\n'"Music: test"
 
-Morphe:
-YouTube: $MORPHE_YT
-Music: $MORPHE_MUSIC
-Reddit: $MORPHE_REDDIT
-
-Anddea:
-YouTube: $ANDDEA_YT
-Music: $ANDDEA_MUSIC
-
-Download Links:
-YouTube: $YT_LINK
-Music: $MUSIC_LINK
-Reddit: $REDDIT_LINK
-EOF
-)
-
-          curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
-            -d chat_id="$CHAT_ID" \
-            --data-urlencode text="$TEXT"
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="${CHAT_ID}" \
+            --data-urlencode text="${TEXT}"
 
       - name: Update versions.txt
         run: |
-          {
-            echo "MORPHE_YT=$MORPHE_YT"
-            echo "MORPHE_MUSIC=$MORPHE_MUSIC"
-            echo "MORPHE_REDDIT=$MORPHE_REDDIT"
-            echo "ANDDEA_YT=$ANDDEA_YT"
-            echo "ANDDEA_MUSIC=$ANDDEA_MUSIC"
-          } > versions.txt
+          echo "TEST=1" > versions.txt
 
-      - name: Commit updated versions
+      - name: Commit changes
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -90,8 +44,9 @@ EOF
           git add versions.txt
 
           if git diff --cached --quiet; then
+            echo "No changes"
             exit 0
           fi
 
-          git commit -m "chore: update compatible versions"
-          git push
+          git commit -m "chore: update versions"
+          git push origin main
