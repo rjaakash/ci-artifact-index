@@ -2,7 +2,6 @@ name: Notify Versions
 
 on:
   workflow_dispatch:
-  workflow_call:
 
 permissions:
   contents: write
@@ -12,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve latest compatible versions
+      - name: Fetch latest versions
         run: |
           set -e
 
@@ -35,26 +34,13 @@ jobs:
           echo "ANDDEA_YT=$ANDDEA_YT" >> $GITHUB_ENV
           echo "ANDDEA_MUSIC=$ANDDEA_MUSIC" >> $GITHUB_ENV
 
-      - name: Build APKMirror Links
-        run: |
-          YT_SLUG=$(echo "$MORPHE_YT" | tr '.' '-')
-          MUSIC_SLUG=$(echo "$MORPHE_MUSIC" | tr '.' '-')
-          REDDIT_SLUG=$(echo "$MORPHE_REDDIT" | tr '.' '-')
-
-          YT_LINK="https://www.apkmirror.com/apk/google-inc/youtube/youtube-${YT_SLUG}-release/"
-          MUSIC_LINK="https://www.apkmirror.com/apk/google-inc/youtube-music/youtube-music-${MUSIC_SLUG}-release/"
-          REDDIT_LINK="https://www.apkmirror.com/apk/redditinc/reddit/reddit-${REDDIT_SLUG}-release/"
-
-          echo "YT_LINK=$YT_LINK" >> $GITHUB_ENV
-          echo "MUSIC_LINK=$MUSIC_LINK" >> $GITHUB_ENV
-          echo "REDDIT_LINK=$REDDIT_LINK" >> $GITHUB_ENV
-
       - name: Send Telegram Notification
         env:
           BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          MESSAGE="🚀 Version Update Detected
+          TEXT=$(cat <<EOF
+Version Update Detected
 
 Morphe:
 YouTube: $MORPHE_YT
@@ -64,28 +50,23 @@ Reddit: $MORPHE_REDDIT
 Anddea:
 YouTube: $ANDDEA_YT
 Music: $ANDDEA_MUSIC
-
-Download Links:
-YouTube: $YT_LINK
-Music: $MUSIC_LINK
-Reddit: $REDDIT_LINK
-"
-
-          curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
-            -d chat_id="$CHAT_ID" \
-            -d text="$MESSAGE"
-
-      - name: Update versions.txt
-        run: |
-          cat > versions.txt <<EOF
-MORPHE_YT=$MORPHE_YT
-MORPHE_MUSIC=$MORPHE_MUSIC
-MORPHE_REDDIT=$MORPHE_REDDIT
-ANDDEA_YT=$ANDDEA_YT
-ANDDEA_MUSIC=$ANDDEA_MUSIC
 EOF
+)
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="${CHAT_ID}" \
+            --data-urlencode "text=${TEXT}"
 
-      - name: Commit updated versions
+      - name: Update versions file
+        run: |
+          {
+            echo "MORPHE_YT=$MORPHE_YT"
+            echo "MORPHE_MUSIC=$MORPHE_MUSIC"
+            echo "MORPHE_REDDIT=$MORPHE_REDDIT"
+            echo "ANDDEA_YT=$ANDDEA_YT"
+            echo "ANDDEA_MUSIC=$ANDDEA_MUSIC"
+          } > versions.txt
+
+      - name: Commit changes
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -96,5 +77,5 @@ EOF
             exit 0
           fi
 
-          git commit -m "chore: update compatible versions"
+          git commit -m "update versions"
           git push origin main
