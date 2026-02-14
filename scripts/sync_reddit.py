@@ -42,11 +42,23 @@ REDDIT_VERSION = os.environ.get("REDDIT_VERSION")
 TMP_DIR = Path("tmp")
 TMP_DIR.mkdir(exist_ok=True)
 
+# Browser-like headers (fix for 403)
 HEADERS = {
-    "User-Agent": "ci-artifact-index/1.0"
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Referer": "https://www.apkmirror.com/",
+    "Connection": "keep-alive",
 }
 
 MAX_PAGES = 25
+
+session = requests.Session()
+session.headers.update(HEADERS)
 
 # -------------------------------------------------
 # Validate required inputs
@@ -73,7 +85,7 @@ for page in range(1, MAX_PAGES + 1):
         else f"{APKMIRROR_BASE}/uploads/page/{page}/?appcategory=reddit"
     )
 
-    r = requests.get(page_url, headers=HEADERS, timeout=30)
+    r = session.get(page_url, timeout=30)
     r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
 
@@ -95,7 +107,7 @@ print(f"[+] Found release page: {release_url}")
 # Select APKM variant using strict priority
 # -------------------------------------------------
 
-r = requests.get(release_url, headers=HEADERS, timeout=30)
+r = session.get(release_url, timeout=30)
 r.raise_for_status()
 soup = BeautifulSoup(r.text, "html.parser")
 
@@ -125,7 +137,7 @@ print(f"[+] Selected variant: {variant_url}")
 # Resolve final APKM URL
 # -------------------------------------------------
 
-r = requests.get(variant_url, headers=HEADERS, timeout=30)
+r = session.get(variant_url, timeout=30)
 r.raise_for_status()
 soup = BeautifulSoup(r.text, "html.parser")
 
@@ -136,7 +148,7 @@ if not download_btn:
 
 download_page = urljoin(APKMIRROR_BASE, download_btn["href"])
 
-r = requests.get(download_page, headers=HEADERS, timeout=30)
+r = session.get(download_page, timeout=30)
 r.raise_for_status()
 soup = BeautifulSoup(r.text, "html.parser")
 
@@ -156,7 +168,7 @@ apkm_path = TMP_DIR / apkm_name
 
 print(f"[+] Downloading {apkm_name}")
 
-with requests.get(apkm_url, headers=HEADERS, stream=True, timeout=120) as r:
+with session.get(apkm_url, stream=True, timeout=120) as r:
     r.raise_for_status()
     with open(apkm_path, "wb") as f:
         for chunk in r.iter_content(8192):
