@@ -8,22 +8,17 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
 
-    steps:
-      # ---------------------------------------
-      # Checkout repository
-      # ---------------------------------------
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
 
-      # ---------------------------------------
-      # Resolve latest compatible versions
-      # ---------------------------------------
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Resolve latest compatible versions
         id: resolve
         run: |
@@ -39,20 +34,17 @@ jobs:
           NEW_ANDDEA_YT=$(curl -s "$ANDDEA_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.youtube"]? // empty | .[]' | sort -V | tail -n 1)
           NEW_ANDDEA_MUSIC=$(curl -s "$ANDDEA_SOURCE" | jq -r '.patches[] | .compatiblePackages["com.google.android.apps.youtube.music"]? // empty | .[]' | sort -V | tail -n 1)
 
-          echo "NEW_MORPHE_YT=$NEW_MORPHE_YT" >> $GITHUB_ENV
-          echo "NEW_MORPHE_MUSIC=$NEW_MORPHE_MUSIC" >> $GITHUB_ENV
-          echo "NEW_MORPHE_REDDIT=$NEW_MORPHE_REDDIT" >> $GITHUB_ENV
-          echo "NEW_ANDDEA_YT=$NEW_ANDDEA_YT" >> $GITHUB_ENV
-          echo "NEW_ANDDEA_MUSIC=$NEW_ANDDEA_MUSIC" >> $GITHUB_ENV
+          {
+            echo "NEW_MORPHE_YT=$NEW_MORPHE_YT"
+            echo "NEW_MORPHE_MUSIC=$NEW_MORPHE_MUSIC"
+            echo "NEW_MORPHE_REDDIT=$NEW_MORPHE_REDDIT"
+            echo "NEW_ANDDEA_YT=$NEW_ANDDEA_YT"
+            echo "NEW_ANDDEA_MUSIC=$NEW_ANDDEA_MUSIC"
+          } >> $GITHUB_ENV
 
-      # ---------------------------------------
-      # Compare with versions.txt
-      # ---------------------------------------
       - name: Compare with stored versions
         id: compare
         run: |
-          set -e
-
           if [ ! -f versions.txt ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -70,12 +62,7 @@ jobs:
 
           echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
 
-      # ---------------------------------------
-      # Trigger notify.yml if changed
-      # ---------------------------------------
-      - name: Trigger Notify Workflow
-        if: steps.compare.outputs.changed == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh workflow run notify.yml
+  notify:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
+    uses: ./.github/workflows/notify.yml
